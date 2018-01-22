@@ -584,7 +584,7 @@ int drawCard(int player, struct gameState *state)
 
 //REFACTOR: card action functions 
 int do_smithy(){//+3 Cards
-      for (i = 0; i < 3; i++)
+      for (i = 0; i =< 3; i++)
   {
     drawCard(currentPlayer, state);
   }
@@ -600,7 +600,7 @@ int do_adventurer(){
   }
   drawCard(currentPlayer, state);
   cardDrawn = state->hand[currentPlayer][state->handCount[currentPlayer]-1];//top card of hand is most recently drawn card.
-  if (cardDrawn == copper || cardDrawn == silver || cardDrawn == gold)
+  if (cardDrawn == copper || cardDrawn == silver)
     drawntreasure++;
   else{
     temphand[z]=cardDrawn;
@@ -623,6 +623,10 @@ int do_adventurer(){
       
       //discard played card from hand
       discardCard(handPos, currentPlayer, state, 0);
+
+
+      drawCard(currentPlayer, state);
+
       return 0;
   }
 
@@ -663,7 +667,7 @@ int do_adventurer(){
       state->numBuys++;
       
       //Each other player draws a card
-      for (i = 0; i < state->numPlayers; i++)
+      for (i = 1; i < state->numPlayers; i++)
   {
     if ( i != currentPlayer )
       {
