@@ -1,3 +1,18 @@
+/*
+
+Mark Buckner
+CS362-400: Software Engineering II (Winter 2018)
+dominion.c
+
+Includes 3 refactored cards: adventurer, smithy, council room
+
+do_adventurer(), do_smithy(), and do_council_room(), respectively
+
+Bugs have also been introduced to these card effects within the refactored sections
+See BUG comments within each function for details on what the bugs are exactly
+*/
+
+
 #include "dominion.h"
 #include "dominion_helpers.h"
 #include "rngs.h"
@@ -643,6 +658,94 @@ int getCost(int cardNumber)
   return -1;
 }
 
+
+/******
+
+################################################################
+REFACTORED CARD EFFECTS
+	ADVENTURER: void do_adventurer()
+	SMITHY: void do_smithy()
+	COUNCIL ROOM: void do_council_room()
+################################################################
+
+******/
+
+void do_adventurer(int currentPlayer, int temphand[], int z, struct gameState *state) {
+	int cardDrawn;
+	int drawntreasure = 0;
+	// BUG: incorrect while-loop will allow the player to reveal cards from their deck until they get 3 treasure cards (should only allow 2: while (drawntreasure < 2)
+	while (drawntreasure < 3) {
+		if (state->deckCount[currentPlayer] < 1) {//if the deck is empty we need to shuffle discard and add to deck
+			shuffle(currentPlayer, state);
+		}
+		drawCard(currentPlayer, state);
+		cardDrawn = state->hand[currentPlayer][state->handCount[currentPlayer] - 1];//top card of hand is most recently drawn card.
+		if (cardDrawn == copper || cardDrawn == silver || cardDrawn == gold)
+			drawntreasure++;
+		else {
+			temphand[z] = cardDrawn;
+			state->handCount[currentPlayer]--; //this should just remove the top card (the most recently drawn one).
+			z++;
+		}
+	}
+
+	while (z - 1 >= 0) {
+		state->discard[currentPlayer][state->discardCount[currentPlayer]++] = temphand[z - 1]; // discard all cards in play that have been drawn
+		z = z - 1;
+	}
+	return;
+}
+
+void do_smithy(int currentPlayer, int handPos, struct gameState *state) {
+	int i;
+	//+3 Cards
+	// BUG: incorrect for-loop settings allow the player to add 4 cards instead of 3 (should be i < 3)
+	for (i = 0; i < 4; i++)
+	{
+		drawCard(currentPlayer, state);
+	}
+
+	//discard card from hand
+	discardCard(handPos, currentPlayer, state, 0);
+	return;
+}
+
+void do_council_room(int currentPlayer, int handPos, struct gameState *state) {
+	int i;
+	// +4 Cards
+	// BUG: incorrect for-loop settings allow the player to add 5 cards (should only add 4 cards, 'i < 4')
+	for (i = 0; i < 5; i++)
+	{
+		drawCard(currentPlayer, state);
+	}
+
+	state->numBuys++;
+
+	// All other players draw a card
+	for (i = 0; i < state->numPlayers; i++)
+	{
+		if (i != currentPlayer)
+		{
+			drawCard(i, state);
+		}
+	}
+
+	// discard played card
+	discardCard(handPos, currentPlayer, state, 0);
+	return;
+}
+
+
+
+/******
+################################################################
+END OF REFACTORED CARD EFFECTS
+################################################################
+*****/
+
+
+
+
 int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState *state, int handPos, int *bonus)
 {
   int i;
@@ -667,48 +770,11 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
   switch( card ) 
     {
     case adventurer:
-      while(drawntreasure<2){
-	if (state->deckCount[currentPlayer] <1){//if the deck is empty we need to shuffle discard and add to deck
-	  shuffle(currentPlayer, state);
-	}
-	drawCard(currentPlayer, state);
-	cardDrawn = state->hand[currentPlayer][state->handCount[currentPlayer]-1];//top card of hand is most recently drawn card.
-	if (cardDrawn == copper || cardDrawn == silver || cardDrawn == gold)
-	  drawntreasure++;
-	else{
-	  temphand[z]=cardDrawn;
-	  state->handCount[currentPlayer]--; //this should just remove the top card (the most recently drawn one).
-	  z++;
-	}
-      }
-      while(z-1>=0){
-	state->discard[currentPlayer][state->discardCount[currentPlayer]++]=temphand[z-1]; // discard all cards in play that have been drawn
-	z=z-1;
-      }
+		do_adventurer(currentPlayer, temphand, z, state);
       return 0;
 			
     case council_room:
-      //+4 Cards
-      for (i = 0; i < 4; i++)
-	{
-	  drawCard(currentPlayer, state);
-	}
-			
-      //+1 Buy
-      state->numBuys++;
-			
-      //Each other player draws a card
-      for (i = 0; i < state->numPlayers; i++)
-	{
-	  if ( i != currentPlayer )
-	    {
-	      drawCard(i, state);
-	    }
-	}
-			
-      //put played card in played card pile
-      discardCard(handPos, currentPlayer, state, 0);
-			
+		do_council_room(currentPlayer, handPos, state);
       return 0;
 			
     case feast:
@@ -825,18 +891,10 @@ int cardEffect(int card, int choice1, int choice2, int choice3, struct gameState
 	    }
 	}
 
-
       return 0;
 		
     case smithy:
-      //+3 Cards
-      for (i = 0; i < 3; i++)
-	{
-	  drawCard(currentPlayer, state);
-	}
-			
-      //discard card from hand
-      discardCard(handPos, currentPlayer, state, 0);
+		do_smithy(currentPlayer, handPos, state);
       return 0;
 		
     case village:
