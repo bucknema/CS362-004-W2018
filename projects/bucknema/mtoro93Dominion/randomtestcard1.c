@@ -1,238 +1,185 @@
 /*
-* Name: Matthew Toro
-* onid: torom
-* Class: CS 362 Software Engineering II
-* Program: testcard1.c
-* Due Date: 2/18/2018
-* Description: Random testing for the card 'Village' in dominion.c
-*/
 
-/*
-FUNCTION TO BE TESTED: playGreatHall
-REQUIREMENTS FOR FUNCTION: 
+MARK BUCKNER
+CS362-400
+randomtestcard1.c
 
-WHAT IS THIS FUNCTION SUPPOSED TO DO?
-draw 1 card. add 2 actions
+Description: This is a random tester for the smithy card
 
-HOW DOES VILLAGE AFFECT THE GAME STATE?
-affects current player's hand, deck, and discard
-affects state.numActions
+To run the test: 
+	make randomtestcard1
+
+Examine results in file: 
+	randomtestcard1.out
 
 */
+/*=====================================================================================================*/
 
-/*
-WHAT TO TEST:
-1. Current player should receive exactly 1 card.
-priorHand = currentHand after village is discarded
 
-2. 1 card should come from his own pile.
-priorDeck - 1 = current Deck Count
+// standard header files for strings, input/output, etc.
+#include <string.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
 
-3. the village card should be discarded
-state.discardCount = prior count + 1
-state.discard[0][discardCount - 1] = village card number
-
-4. the current player should receive exactly 2 actions
-
-5. No state change should occur for other players.
-for each other player
-	prior value = current value
-
-6. No state change should occur to the victory card piles and kingdom card piles.
-for each card
-	prior supply count = current supply count
-
-*/
-
-/* -----------------------------------------------------------------------
- * Demonstration of how to write unit tests for dominion-base
- * Include the following lines in your makefile:
- *
- * randomtestcard1: randomtestcard1.c dominion.o rngs.o
- *      gcc -o randomtestcard1 -g  randomtestcard1.c dominion.o rngs.o $(CFLAGS)
- * -----------------------------------------------------------------------
- */
-
+// dominion game header files
 #include "dominion.h"
 #include "dominion_helpers.h"
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
 #include "rngs.h"
-#include <stdlib.h>
 
-// set NOISY_TEST to 0 to remove printfs from output
-#define NOISY_TEST 0
-int const NUM_PASSES = 31;
-int const NUM_RUNS = 200;
-int assertTrue(int booleanExpression, char* testCase);
-int checkForRepeat(int* indices, int length, int target);
+
+// global variables to keep track of test failures
+int EFFECT_FAILS = 0;
+int DISCARD_FAILS = 0;
+int DRAW_FAILS = 0;
+int HANDCOUNT_FAILS = 0;
+
+// this function takes a randomly generated gamestate, and then checks the smithy card
+void RANDOM_TEST_SMITHY(int p, struct gameState *post_state) {
+	
+	// vars to hold return results of various function tests
+	int carEff, draw1, draw2, draw3, disCar;
+
+	// pre-gamestate variable (for comparison with postgamestate)
+	struct gameState pre_state;
+
+	// copy the passed in randomly generated gamestate to pre-state
+	memcpy(&pre_state, post_state, sizeof(struct gameState));
+	int bonus = 0;
+
+	// call the card effect function with the smithy card
+	carEff = cardEffect(smithy, 0, 0, 0, post_state, 0, &bonus);
+
+	// call draw card 3 times
+	draw1 = drawCard(p, &pre_state);
+	draw2 = drawCard(p, &pre_state);
+	draw3 = drawCard(p, &pre_state);
+
+	// call discardCard
+	disCar = discardCard(0, p, &pre_state, 0);
+
+	// store values of hand and deck counts, pre and post
+	int post_handcount = post_state->handCount[p];
+	int post_deckcount = post_state->deckCount[p];
+
+	int pre_handcount = pre_state.handCount[p];
+	int pre_deckcount = pre_state.deckCount[p];
+
+	// check for drawcard fails
+	if (draw1 == -1 && pre_state.deckCount[p] != 0) {
+		DRAW_FAILS++;
+	}
+	if (draw2 == -1 && pre_state.deckCount[p] != 0) {
+		DRAW_FAILS++;
+	}
+	if (draw3 == -1 && pre_state.deckCount[p] != 0) {
+		DRAW_FAILS++;
+	}
+
+	// check if cardeffect or discardCard failed
+	if (!(carEff == 0 && disCar == 0)) {
+		if (carEff) {
+			EFFECT_FAILS++;
+		}
+		if (disCar) {
+			DISCARD_FAILS++;
+		}
+	}
+
+	// check if the hand and deck counts dont match up
+	if (!(post_handcount == pre_handcount && post_deckcount == pre_deckcount)) {
+		HANDCOUNT_FAILS++;
+	}
+}
+
+
+/*
+
+==========================================================================
+MAIN FUNCTION
+==========================================================================
+
+*/
+
 
 int main() {
-    int i, j, k;
-    int randomSeed = 1000;
-	int success;
-	int passedTests = 0;
-	int randomPlayerCountPassedTests = 0;
-	int randomPlayerCountTotalTests = 0;
-	for (k = 0; k < NUM_RUNS; k++)
-	{
-		// generate a random set of non-repeat kingdomCards 
-		// integers between 7-26 because 0 - 6 are required
-		int kingdomCards[10];
-		int priorIndices[10];
-		int randomIndex;
-		for (i = 0; i < 10; i++)
-		{
-			do
-			{
-				randomIndex = rand() % 20 + 7;
-			}while(checkForRepeat(priorIndices, 10, randomIndex));
-			
-			priorIndices[i] = randomIndex;
-			kingdomCards[i] = randomIndex;
-		}
-		
-		// generate a random playerCount of 2 - 4
-		int playerCount = rand() % 3 + 2;
-		struct gameState state;
-		printf ("TESTING Village:\n");
+	printf(">>>>> RANDOM TEST smithy <<<<<\n");
+	printf("File: randomtestcard1.c\n");
+	printf("\n==========================================================\n");
 
-		// initialize a new game using random player count and kingdom cards
-		success = initializeGame(playerCount, kingdomCards, randomSeed, &state);
-		
-		// now we will randomize the game state
-		for (i = 0; i < playerCount; i++)
-		{
-			// maximum hand_size is 500
-			// maximum deck_size is 500
-			int randomHandSize = rand() % 500 + 1;
-			state.handCount[i] = randomHandSize;
-			for (j = 0; j < randomHandSize - 2; j++)
-			{
-				int randChoice = rand() % 2;
-				if (randChoice == 0)
-				{
-					int randomIndex = rand() % 10;
-					state.hand[i][j] = kingdomCards[randomIndex];
-				}
-				else
-				{
-					int randomIndex = rand() % 7;
-					state.hand[i][j] = randomIndex;
-				}
-				
-			}
-			state.hand[i][randomHandSize - 1] = village;
-			
-			int randomDeckSize = rand() % 500 + 1;
-			state.deckCount[i] = randomDeckSize;
-			for (j = 0; j < randomDeckSize; j++)
-			{
-				int randChoice = rand() % 2;
-				if (randChoice == 0)
-				{
-					int randomIndex = rand() % 10;
-					state.hand[i][j] = kingdomCards[randomIndex];
-				}
-				else
-				{
-					int randomIndex = rand() % 7;
-					state.hand[i][j] = randomIndex;
-				}
-			}
-			
-			// i have to keep discard less than 500
-			// however, since the hand is not discarded in this test case,
-			// I can bound it only be the deck size
-			int randomDiscardSize = 500 - randomDeckSize - 1;
-			state.discardCount[i] = randomDiscardSize;
-			
-			for (j = 0; j < randomDiscardSize; j++)
-			{
-				int randChoice = rand() % 2;
-				if (randChoice == 0)
-				{
-					int randomIndex = rand() % 10;
-					state.hand[i][j] = kingdomCards[randomIndex];
-				}
-				else
-				{
-					int randomIndex = rand() % 7;
-					state.hand[i][j] = randomIndex;
-				}
-			}
-		}
-		
-		printf ("TESTING Village:\n");
-		// initialize a new game using starting decks for these tests
-		// since initialize also draws their starting hands then the starting deck begins with 5 cards
-		success = initializeGame(playerCount, kingdomCards, randomSeed, &state);
-		struct gameState priorState;
-		memcpy(&priorState, &state, sizeof(struct gameState));
-		
-		success = cardEffect(village, 0, 0, 0, &state, state.handCount[0] - 1, 0);
-		
-		// these two tests should fail because of the bug introduced in assignment-2
-		passedTests+=assertTrue(priorState.handCount[0] == state.handCount[0], "Current hand count remains the same");
-		passedTests+=assertTrue(priorState.deckCount[0] - 1 == state.deckCount[0], "Current player deck count decremented by 1");
-		
-		passedTests+=assertTrue(priorState.discardCount[0] + 1 == state.discardCount[0], "Current player discard count incremented");
-		
-		passedTests+=assertTrue(priorState.numActions + 2 == state.numActions, "number of actions incremented by 2");
-		
-		// these tests actually discover a bug either in Smithy or discardCard
-		passedTests+=assertTrue(state.discard[0][state.discardCount[0] - 1] == village, "Village card in current player discard");
-		passedTests+=assertTrue(success == 0, "Function returned successfully");
-		
-		randomPlayerCountTotalTests+= (playerCount - 1) * 3;
-		for ( i = 1; i < playerCount; i++)
-		{
-			printf("Player %d:\n", i);
-			randomPlayerCountPassedTests+=assertTrue(priorState.handCount[i] == state.handCount[i], "Hand remains the same");
-			randomPlayerCountPassedTests+=assertTrue(priorState.deckCount[i] == state.deckCount[i], "Deck remains the same");
-			randomPlayerCountPassedTests+=assertTrue(priorState.discardCount[i] == state.discardCount[i], "Discard remains the same");	
+	//iterations of random testing
+	int iterations = 20000;
+
+	int i, n;
+	int player;
+
+	// the gamestate struct holds all the important game setting variables
+	struct gameState Gstate;
+
+	// seed random number generator
+	srand(time(NULL));
+
+	// randomly initialize the gamestate
+	for (n = 0; n < iterations; n++) {
+
+		for (i = 0; i < sizeof(struct gameState); i++) {
+			((char*)&Gstate)[i] = floor(Random() * 256);
 		}
 
-		for (i = 0; i < 25; i++)
-		{
-			printf("Kingdom Card: %d\n", i);
-			passedTests+=assertTrue(priorState.supplyCount[i] == state.supplyCount[i], "Kingdom card supply remains the same");
-		}
+		// randomly select values, keeping within the sensible boundaries of Dominion game rules
+		player = floor(Random() * MAX_PLAYERS);
+		Gstate.deckCount[player] = floor(Random() * MAX_DECK);
+		Gstate.discardCount[player] = floor(Random() * MAX_DECK);
+		Gstate.handCount[player] = floor(Random() * MAX_HAND);
+		Gstate.playedCardCount = floor(Random() * (MAX_DECK - 1));
+		Gstate.whoseTurn = player;
+
+		// call the test for adventurer, passing in randomly generated gamestate 
+		RANDOM_TEST_SMITHY(player, &Gstate);
 	}
-	if (passedTests + randomPlayerCountPassedTests == NUM_PASSES*NUM_RUNS + randomPlayerCountTotalTests)
-		printf("All tests passed!\n");
-	else
-		printf("%d tests passed. %d tests failed.\n", passedTests + randomPlayerCountPassedTests, NUM_PASSES*NUM_RUNS + randomPlayerCountTotalTests - randomPlayerCountPassedTests - passedTests);
 
-    return 0;
-}
+	// add up failed tests
+	int TOTAL_FAILS = EFFECT_FAILS + DISCARD_FAILS + DRAW_FAILS + HANDCOUNT_FAILS;
 
+	/*
+	===============================================================================
+	REPORT RANDOM TEST RESULTS
+	===============================================================================
+	*/
 
-int assertTrue(int booleanExpression, char* testCase)
-{
-	if (booleanExpression == 0)
-	{
-		printf("Test failed: ");
-		printf(testCase);
-		printf("\n");
-		return 0;
+	printf("\n==========================================================\n");
+
+	printf("\n>>>>> RANDOM TEST RESULTS <<<<<\n");
+
+	if (iterations - TOTAL_FAILS < 0){
+		printf("PASSED TESTS: 0");
 	}
-	else
-	{
-		printf("Test passed: ");
-		printf(testCase);
-		printf("\n");
-		return 1;
-	}	
-}
-int checkForRepeat(int* indices, int length, int target)
-{
-	int i;
-	for (i = 0; i < length; i++)
-	{
-		if (target == indices[i])
-			return 1;
+	else {
+		printf("PASSED TESTS: %d\n", iterations - TOTAL_FAILS);
 	}
+	printf("FAILED TESTS: %d\n", TOTAL_FAILS);
+
+	if (TOTAL_FAILS == 0) {
+		printf(">>>>> PASSED RANDOM TESTING WITH 0 FAILS!!! <<<<<\n\n");
+	}
+
+	else {
+		printf("\n>>>>> FAILURE RESULTS <<<<<\n");
+
+		printf("Card effect fails: %d\n", EFFECT_FAILS);
+		printf("Draw card fails: %d\n", DRAW_FAILS);
+		printf("Discard fails: %d\n", DISCARD_FAILS);
+		printf("Primary player hand/deck count fails: %d\n", HANDCOUNT_FAILS);
+		printf(">>>>> FAILED RANDOM TEST!!! <<<<<\n\n");
+	}
+
+	printf("\n==========================================================\n");
+	printf(">>>>> COVERAGE <<<<<\n");
+	// gcov info will be concatenated after here
+
 	return 0;
 }
+
+//EOF

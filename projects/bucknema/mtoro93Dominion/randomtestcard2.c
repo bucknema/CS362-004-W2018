@@ -1,242 +1,229 @@
 /*
-* Name: Matthew Toro
-* onid: torom
-* Class: CS 362 Software Engineering II
-* Program: randomtestcard2.c
-* Due Date: 2/18/2018
-* Description: Random testing for the card 'Great Hall' in dominion.c
-*/
 
-/*
-FUNCTION TO BE TESTED: playGreatHall
-REQUIREMENTS FOR FUNCTION: 
+MARK BUCKNER
+CS362-400
+randomtestcard2.c
 
-WHAT IS THIS FUNCTION SUPPOSED TO DO?
-draws 1 card from the current player's deck and adds to their hand
-also adds 1 action to the current player's action
-great hall is then discard
+Description: This is a random tester for the council room card
 
-HOW DOES GREAT HALL AFFECT THE GAME STATE?
-affects current player's hand, deck, and discard
-affects state.numActions
-*/
+To run the test:
+	make randomtestcard2
 
-/*
-WHAT TO TEST:
-1. Current player should receive exactly 1 card.
-priorHand = currentHand after great hall is discarded
-
-2. 1 card should come from his own pile.
-priorDeck - 1 = current Deck Count
-
-3. the great hall card should be discarded
-state.discardCount = prior count + 1
-state.discard[0][discardCount - 1] = great hall card number
-
-4. the current player should receive exactly 1 action
-
-5. No state change should occur for other players.
-for each other player
-	prior value = current value
-
-6. No state change should occur to the victory card piles and kingdom card piles.
-for each card
-	prior supply count = current supply count
+Examine results in file:
+	randomtestcard2.out
 
 */
+/*=====================================================================================================*/
 
-/* -----------------------------------------------------------------------
- * Demonstration of how to write unit tests for dominion-base
- * Include the following lines in your makefile:
- *
- * cardtest3: cardtest3.c dominion.o rngs.o
- *      gcc -o cardtest3 -g  cardtest3.c dominion.o rngs.o $(CFLAGS)
- * -----------------------------------------------------------------------
- */
+// standard header files for strings, input/output, etc.
+#include <string.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <stdio.h>
+#include <time.h>
+#include <math.h>
 
+// dominion game header files
 #include "dominion.h"
 #include "dominion_helpers.h"
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
 #include "rngs.h"
-#include <stdlib.h>
 
-// set NOISY_TEST to 0 to remove printfs from output
-#define NOISY_TEST 0
-int const NUM_PASSES = 31;
-int const NUM_RUNS = 200;
-int assertTrue(int booleanExpression, char* testCase);
-int checkForRepeat(int* indices, int length, int target);
+// global variables to keep track of test failures
+int EFFECT_FAILS = 0;
+int DISCARD_FAILS = 0;
+int DRAW_FAILS = 0;
+int HANDCOUNT_FAILS = 0;
+int BUYCOUNT_FAILS = 0;
+int OPPONENT_HANDCOUNT_FAILS = 0;
+
+// this function takes a randomly generated gamestate, and then tests the council room card
+void RANDOM_TEST_COUNCIL_ROOM(int p, struct gameState *post_state) {
+	int carEff, draw1, draw2, draw3, draw4, w, disCar, i;
+	int bonus = 0;
+
+	// game state variable to manually act on the functions actions
+	struct gameState pre_state;
+
+	// copy the passed in game state to pre_state
+	memcpy(&pre_state, post_state, sizeof(struct gameState));
+
+	// call the card effect function for council room
+	carEff = cardEffect(council_room, 0, 0, 0, post_state, 0, &bonus);
+
+	// draw card 4x times
+	draw1 = drawCard(p, &pre_state);
+	draw2 = drawCard(p, &pre_state);
+	draw3 = drawCard(p, &pre_state);
+	draw4 = drawCard(p, &pre_state);
+
+	pre_state.numBuys++;
+
+	// each player draws a card
+	for (i = 0; i < pre_state.numPlayers; i++) {
+		if (i != p) {
+			w = drawCard(i, &pre_state);
+			
+			// check for drawCard fails
+			if (w == -1 && pre_state.deckCount[i] != 0) {
+				DRAW_FAILS++;
+			}
+		}
+	}
+
+	// check discardCard manually
+	disCar = discardCard(0, p, &pre_state, 0);
+
+	// store values of hand and deck counts, pre and post
+	int post_handcount = post_state->handCount[p];
+	int post_deckcount = post_state->deckCount[p];
+
+	int pre_handcount = pre_state.handCount[p];
+	int pre_deckcount = pre_state.deckCount[p];
+
+	// check if buy counts dont match up
+	if (pre_state.numBuys != post_state->numBuys) {
+		BUYCOUNT_FAILS++;
+	}
+
+	// check for drawcard fails
+	if (draw1 == -1 && pre_state.deckCount[p] != 0) {
+		DRAW_FAILS++;
+	}
+	if (draw2 == -1 && pre_state.deckCount[p] != 0) {
+		DRAW_FAILS++;
+	}
+	if (draw3 == -1 && pre_state.deckCount[p] != 0) {
+		DRAW_FAILS++;
+	}
+	if (draw4 == -1 && pre_state.deckCount[p] != 0) {
+		DRAW_FAILS++;
+	}
+
+	// check cardeffect or discardCard fails
+	if (!(carEff == 0 && disCar == 0)) {
+		if (carEff) {
+			EFFECT_FAILS++;
+		}
+		if (disCar) {
+			DISCARD_FAILS++;
+		}
+	}
+
+	// check if the primary player hand and deck counts are incorrect
+	if (!(post_handcount == pre_handcount && post_deckcount == pre_deckcount)) {
+		HANDCOUNT_FAILS++;
+	}
+
+	// check if the other players hand and deck counts are incorrect (council room affects others too!)
+	for (i = 0; i < pre_state.numPlayers; i++) {
+		if (i != p) {
+			if (!(post_state->handCount[i] == pre_state.handCount[i] &&
+				post_state->deckCount[i] == pre_state.deckCount[i])) {
+				OPPONENT_HANDCOUNT_FAILS++;
+			}
+		}
+	}
+}
+
+
+/*
+
+==========================================================================
+MAIN FUNCTION
+==========================================================================
+
+*/
 
 int main() {
-    int i, j, k;
-    int randomSeed = 1000;
-	int success;
-	int passedTests = 0;
-	int randomPlayerCountPassedTests = 0;
-	int randomPlayerCountTotalTests = 0;
-	for (k = 0; k < NUM_RUNS; k++)
-	{
-		// generate a random set of non-repeat kingdomCards 
-		// integers between 7-26 because 0 - 6 are required
-		int kingdomCards[10];
-		int priorIndices[10];
-		int randomIndex;
-		for (i = 0; i < 10; i++)
-		{
-			do
-			{
-				randomIndex = rand() % 20 + 7;
-			}while(checkForRepeat(priorIndices, 10, randomIndex));
-			
-			priorIndices[i] = randomIndex;
-			kingdomCards[i] = randomIndex;
+	printf(">>>>> RANDOM TEST council room <<<<<\n");
+	printf("File: randomcardtest2.c\n");
+	printf("\n==========================================================\n");
+
+	//iterations of random testing
+	int iterations = 20000; 
+
+	int i, n;
+	int player;
+	int deckCount, handCount, discardCount;
+	int numberOfPlayers[] = { 2,3,4 };
+
+	// the gamestate struct holds all the important game setting variables
+	struct gameState Gstate;
+
+	// seed the random number generator
+	srand(time(NULL));
+
+	// randomly select values, keeping within the sensible boundaries of Dominion game rules
+	for (n = 0; n < iterations; n++) {
+
+		for (i = 0; i < sizeof(struct gameState); i++) {
+			((char*)&Gstate)[i] = floor(Random() * 256);
 		}
 
-		// generate a random playerCount of 2 - 4
-		int playerCount = rand() % 3 + 2;	
-		struct gameState state;	
-		printf ("TESTING Great Hall:\n");
+		// randomly set values, keeping within Dominion boundaries
+		Gstate.numPlayers = numberOfPlayers[rand() % 3];
+		Gstate.numBuys = 1;
+		Gstate.playedCardCount = floor(Random() * (MAX_DECK - 1));
+		player = Gstate.numPlayers - 2;
+		deckCount = floor(Random() * MAX_DECK);
+		handCount = floor(Random() * MAX_HAND);
+		discardCount = floor(Random() * MAX_DECK);
+		Gstate.whoseTurn = player;
 
-		// initialize a new game using random player count and kingdom cards
-		success = initializeGame(playerCount, kingdomCards, randomSeed, &state);
-		
-		// now we will randomize the game state
-		for (i = 0; i < playerCount; i++)
-		{
-			// maximum hand_size is 500
-			// maximum deck_size is 500
-			int randomHandSize = rand() % 500 + 1;
-			state.handCount[i] = randomHandSize;
-			for (j = 0; j < randomHandSize - 2; j++)
-			{
-				int randChoice = rand() % 2;
-				if (randChoice == 0)
-				{
-					int randomIndex = rand() % 10;
-					state.hand[i][j] = kingdomCards[randomIndex];
-				}
-				else
-				{
-					int randomIndex = rand() % 7;
-					state.hand[i][j] = randomIndex;
-				}
-				
-			}
-			state.hand[i][randomHandSize - 1] = great_hall;
-			
-			int randomDeckSize = rand() % 500 + 1;
-			state.deckCount[i] = randomDeckSize;
-			for (j = 0; j < randomDeckSize; j++)
-			{
-				int randChoice = rand() % 2;
-				if (randChoice == 0)
-				{
-					int randomIndex = rand() % 10;
-					state.hand[i][j] = kingdomCards[randomIndex];
-				}
-				else
-				{
-					int randomIndex = rand() % 7;
-					state.hand[i][j] = randomIndex;
-				}
-			}
-			
-			// i have to keep discard less than 500
-			// however, since the hand is not discarded in this test case,
-			// I can bound it only be the deck size
-			int randomDiscardSize = 500 - randomDeckSize - 1;
-			state.discardCount[i] = randomDiscardSize;
-			
-			for (j = 0; j < randomDiscardSize; j++)
-			{
-				int randChoice = rand() % 2;
-				if (randChoice == 0)
-				{
-					int randomIndex = rand() % 10;
-					state.hand[i][j] = kingdomCards[randomIndex];
-				}
-				else
-				{
-					int randomIndex = rand() % 7;
-					state.hand[i][j] = randomIndex;
-				}
-			}
-		}
-		
-		//  randomize numActions and numBuys
-		state.numActions = rand() % 10 + 1;
-		state.numBuys = rand() % 10 + 1;
-		
-		printf ("TESTING Great Hall:\n");
-		
-		// initialize a new game using starting decks for these tests
-		// since initialize also draws their starting hands then the starting deck begins with 5 cards
-		success = initializeGame(playerCount, kingdomCards, randomSeed, &state);
-		struct gameState priorState;
-		memcpy(&priorState, &state, sizeof(struct gameState));
-		
-		success = cardEffect(great_hall, 0, 0, 0, &state, state.handCount[0] - 1, 0);
-		
-		passedTests+=assertTrue(priorState.handCount[0] == state.handCount[0], "Current hand contains exactly 3 more cards");
-		passedTests+=assertTrue(priorState.deckCount[0] - 1 == state.deckCount[0], "Current player deck count decremented by 3");
-		
-		passedTests+=assertTrue(priorState.discardCount[0] + 1 == state.discardCount[0], "Current player discard count incremented");
-		
-		passedTests+=assertTrue(priorState.numActions + 1 == state.numActions, "Number of actions incremented");
-		
-		passedTests+=assertTrue(state.discard[0][state.discardCount[0] - 1] == great_hall, "Great Hall card in current player discard");
-		passedTests+=assertTrue(success == 0, "Function returned successfully");
-		randomPlayerCountTotalTests+= (playerCount - 1) * 3;
-		for ( i = 1; i < playerCount; i++)
-		{
-			printf("Player %d:\n", i+1);
-			randomPlayerCountPassedTests+=assertTrue(priorState.handCount[i] == state.handCount[i], "Hand remains the same");
-			randomPlayerCountPassedTests+=assertTrue(priorState.deckCount[i] == state.deckCount[i], "Deck remains the same");
-			randomPlayerCountPassedTests+=assertTrue(priorState.discardCount[i] == state.discardCount[i], "Discard remains the same");	
+		// set hand and deck values of other players
+		for (i = 0; i < Gstate.numPlayers; i++) {
+			Gstate.deckCount[i] = deckCount;
+			Gstate.handCount[i] = handCount;
+			Gstate.discardCount[i] = discardCount;
 		}
 
-		for (i = 0; i < 25; i++)
-		{
-			printf("Kingdom Card: %d\n", i);
-			passedTests+=assertTrue(priorState.supplyCount[i] == state.supplyCount[i], "Kingdom card supply remains the same");
-		}
+		// call the test for adventurer, passing in randomly generated gamestate
+		RANDOM_TEST_COUNCIL_ROOM(player, &Gstate);
 	}
-		
-	if (passedTests + randomPlayerCountPassedTests == NUM_PASSES*NUM_RUNS + randomPlayerCountTotalTests)
-		printf("All tests passed!\n");
-	else
-		printf("%d tests passed. %d tests failed.\n", passedTests + randomPlayerCountPassedTests, NUM_PASSES*NUM_RUNS + randomPlayerCountTotalTests - randomPlayerCountPassedTests - passedTests);
-
-    return 0;
-}
 
 
-int assertTrue(int booleanExpression, char* testCase)
-{
-	if (booleanExpression == 0)
-	{
-		printf("Test failed: ");
-		printf(testCase);
-		printf("\n");
-		return 0;
+	/*
+	===============================================================================
+	REPORT RANDOM TEST RESULTS
+	===============================================================================
+	*/
+	printf("\n==========================================================\n");
+
+	// add up failed tests
+	int TOTAL_FAILS = EFFECT_FAILS + DISCARD_FAILS + DRAW_FAILS + HANDCOUNT_FAILS + BUYCOUNT_FAILS;
+	
+	printf("\n>>>>> RANDOM TEST RESULTS <<<<<<\n");
+
+	if (iterations - TOTAL_FAILS <= 0) { // need this check because we can fail more than 1 test per iteration
+		printf("PASSED TESTS: 0\n\n");
 	}
-	else
-	{
-		printf("Test passed: ");
-		printf(testCase);
-		printf("\n");
-		return 1;
-	}	
-}
-int checkForRepeat(int* indices, int length, int target)
-{
-	int i;
-	for (i = 0; i < length; i++)
-	{
-		if (target == indices[i])
-			return 1;
+	else {
+		printf("PASSED TESTS: %d\n", iterations - TOTAL_FAILS);
 	}
+	printf("FAILED TESTS: %d\n", TOTAL_FAILS);
+
+	if (TOTAL_FAILS == 0) {
+		printf(">>>>> PASSED RANDOM TESTING WITH 0 FAILS!! <<<<<\n\n");
+	}
+
+	else {
+		printf("\n>>>>> FAILURE RESULTS <<<<<\n");
+
+		printf("Card effect fails: %d\n", EFFECT_FAILS);
+		printf("Draw fails: %d\n", DRAW_FAILS);
+		printf("Discard fails: %d\n", DISCARD_FAILS);
+		printf("Buy count fails: %d\n", BUYCOUNT_FAILS);
+		printf("Other players hand/deck count fails: %d\n", OPPONENT_HANDCOUNT_FAILS);
+		printf("Primary player hand/deck count fails: %d\n", HANDCOUNT_FAILS);
+		printf(">>>>> FAILED RANDOM TESTING!!! <<<<<\n\n");
+	}
+
+	printf("\n==========================================================\n");
+	printf(">>>>> COVERAGE <<<<<\n");
+	// gcov info will be concatenated after here
+
+
 	return 0;
 }
+
+//EOF
