@@ -1,0 +1,104 @@
+Bug Reports
+Smithy-bug 
+Location: in mtoro93Dominion/dominion.c, void playSmithy():
+
+Summary: 
+The smithy card fails to create its intended effect (make the current player draw 3 cards.) Worse yet, it can potentially crash the whole program with a segmentation fault.
+
+Documentation: 
+My random tester for smithy (randomtestcard1.c) caused a segmentation fault, so right from the start I knew that there must be a bug somewhere in my teammate’s code for the smithy card. Unfortunately, a segmentation fault alone does not provide very great clues regarding where the bug is, so I needed to do some additional testing. 
+
+Thus, I switched over to my unit test for the smithy card (cardtest1.c) to see if I could better pinpoint exactly what was causing the segmentation fault during my random test. In a sense, I first discovered the smithy bug with a large random tester, but then I narrowed down the actual location of the bug with my much smaller and simpler unit tester for smithy. Examining my error report in my unittestresults.out file, I was able to get a better look at exactly how smithy was failing:
+
+----------------- Testing Card: smithy ----------------
+hand count = 5, expected = 5
+now running cardEffect(smithy...) 
+ Hand count should +3 (draw three cards)
+ Deck count should set to 2. 
+Coin count should remain same.
+
+new hand count = 5, previously = 5
+new deck count = 4, previously = 5
+new coin count = 4, previously = 4
+
+ >>>>>: Testing complete smithy Please examine output versus expected results.<<<<<
+
+Clearly from the unit test output, I was able to see that the smithy card was not resulting in the player drawing 3 cards, which was the intended card effect. The next logical step was to look at the code in dominion.c that controls the smithy card effect. For my partner mtoro93’s dominion.c file, smithy was implemented as follows: 
+
+void playSmithy(int currentPlayer, struct gameState *state, int handPos)
+{
+	//+3 Cards
+	int i;
+    for (i = 0; i < 3; i++)
+	{
+	  drawCard(i, state);
+	}
+			
+    //discard card from hand
+    discardCard(handPos, currentPlayer, state, 0);
+}
+
+On first glance, everything looked normal; the for-loop iterates 3 times, which is correct, and afterwards discardCard() is called properly. 
+
+By process of elimination, the bug occurs in the drawCard() statement – the function should’ve taken currentPlayer as its first argument, not i. Smithy is only supposed to affect the player who uses the card, and nobody else. However, with the way mtoro93’s code was set up, three different players in the game would be drawing a card instead of just the ‘currentPlayer’ at each iteration of the loop as the variable ‘i’ is incremented.
+
+This explained why a segmentation fault was caused in my random tester: if playSmithy() was trying to make player-3 draw a card in a game with only 2 players, the program would be trying to use inaccessible memory and crash.
+
+Council Room-bug 
+Location: in mtoro93Dominion/dominion.c, void playCouncilRoom():
+
+Summary: 
+The council room card fails to create its intended effect (make the current player draw 4 cards and get +1 buy; make each other player in the game draw 1 card.) Only the current player draws cards, and each other player never draws a card.
+
+Documentation:
+I tested council room with my random tester (randomtestcard2.out), but did not have a unit tester available for this card. The randomtestcard2.out error report showed very clearly that there was a bug somewhere in the council room card code, because the card passed 0 tests and failed all 20,000 iterations of my random tester: 
+>>>>> RANDOM TEST RESULTS <<<<<<
+PASSED TESTS: 0
+
+FAILED TESTS: 20000
+
+>>>>> FAILURE RESULTS <<<<<
+Card effect fails: 0
+Draw fails: 0
+Discard fails: 0
+Buy count fails: 0
+Other players hand/deck count fails: 40049
+Primary player hand/deck count fails: 20000
+>>>>> FAILED RANDOM TESTING!!! <<<<<
+==========================================================
+More specifically, the error report from my random tester showed that the bug was causing the primary player’s hand/deck count to be off, as well as the other players’ hand/deck counts. With the council room card, it’s important to note that the card effect not only changes the primary player’s hand count, but also changes the hand count of every other player in the game. 
+
+The most obvious step after examining the error report from my random tester was to go to the dominion.c code itself and locate the function which implements the card effect for council room. In my teammate mtoro93’s code, council room was implemented as follows: 
+
+void playCouncilRoom(int currentPlayer, struct gameState *state, int handPos)
+{
+	int i;
+	      //+4 Cards
+      for (i = 0; i < 4; i++)
+	{
+	  drawCard(currentPlayer, state);
+	}
+			
+      //+1 Buy
+      state->numBuys++;
+			
+      //Each other player draws a card
+      for (i = 0; i < state->numPlayers; i++)
+	{
+	  if ( i == currentPlayer )
+	    {
+	      drawCard(i, state);
+	    }
+	}
+			
+      //put played card in played card pile
+      discardCard(handPos, currentPlayer, state, 0);
+}
+
+This bug was subtle to pinpoint without paying close attention to each statement. The for-loops seemed to be set up with the correct number of iterations such that the proper number of cards would be drawn both for the primary player and for each other player. Since my error report from my random tester indicated that the bug was specifically causing an error with players’ hand counts (not with discarding or the number of buys), I knew the bug must’ve occurred somehow near the calls to drawCard(). 
+
+Upon closer inspection of the statements immediately proceeding and following drawCard(), I was able to determine that the second drawCard() function call is immediately proceeded by an incorrect conditional statement: if (i == currentPlayer). The correct conditional statement would be: if (i != currentPlayer). 
+
+The way the code was set up, no other player would ever draw a card except for the primary player who played the council room card in the first place. Thus, the card didn’t have its intended effect, because each other player would never draw a card. drawCard() was only called the initial 4 times for the current player, and then again when i == current player, but nowhere in the code would other players in the game have a chance to draw a card. 
+
+This makes the bug problem twofold: (1) the primary player draws the wrong number of cards, and (2) the other players never draw a card at all. This is why my random tester reported errors not only in other players’ hand counts, but also in the primary player’s hand count, because when i == current player in the second for-loop, the current player was able to draw an additional card beyond the initial 4 that they were supposed to.
