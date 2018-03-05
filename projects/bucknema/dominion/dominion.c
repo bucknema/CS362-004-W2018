@@ -673,8 +673,8 @@ REFACTORED CARD EFFECTS
 void do_adventurer(int currentPlayer, int temphand[], int z, struct gameState *state) {
 	int cardDrawn;
 	int drawntreasure = 0;
-	// BUG: incorrect while-loop will allow the player to reveal cards from their deck until they get 3 treasure cards (should only allow 2: while (drawntreasure < 2)
-	while (drawntreasure < 3) {
+	// !FIXED! BUG: incorrect while-loop will allow the player to reveal cards from their deck until they get 3 treasure cards (should only allow 2: while (drawntreasure < 2)
+	while (drawntreasure < 2) {
 		if (state->deckCount[currentPlayer] < 1) {//if the deck is empty we need to shuffle discard and add to deck
 			shuffle(currentPlayer, state);
 		}
